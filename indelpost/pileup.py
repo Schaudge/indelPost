@@ -1,28 +1,88 @@
-#cython: profile=False
-
 import re
 import random
-cimport cython
 
-from cpython cimport array
 import array
 
-from  functools import partial
+from functools import partial
 from difflib import get_close_matches, SequenceMatcher
 
 
-from indelpost.variant cimport Variant
-from indelpost.local_reference cimport UnsplicedLocalReference
+from indelpost.variant import Variant
+from indelpost.local_reference import UnsplicedLocalReference
 
 from .consensus import consensus_refseq
 from .gappedaln import find_by_normalization
 
-from indelpost.utilities cimport (
-    split, 
-    locate_indels, 
-    get_spliced_subreads,
-    count_lowqual_non_ref_bases,
-)
+
+def get_spliced_subreads(cigarstring: str, read_start_pos: int, read_end_pos: int) -> list:
+    i = 0
+    cigar_lst = cigar_ptrn.findall(cigarstring)
+    pos_lst = [read_start_pos]
+    res = []
+
+    if not "N" in cigarstring:
+        return [(read_start_pos, read_end_pos)]
+
+    prev_event = "A"
+    for cigar in cigar_lst:
+        event, event_len = cigar[-1], int(cigar[:-1])
+
+        if event == "N":
+            pos_lst.append(read_start_pos - 1)
+        elif prev_event == "N":
+            pos_lst.append(read_start_pos)
+
+        if event in ("I", "H", "P"):
+            pass
+        else:
+            read_start_pos += event_len
+
+        prev_event = event
+
+    if prev_event != "N":
+        pos_lst.append(read_end_pos)
+
+    while i < len(pos_lst):
+        res.append(pos_lst[i: i + 2])
+        i += 2
+
+    return res
+
+
+def count_lowqual_non_ref_bases(read_seq: str, ref_seq: str, quals: array.array, cigar_list: list,
+                                basequalthresh: int) -> int:
+    i = 0;
+    j = 0;
+    k = 0;
+    cnt = 0;
+    event_len = 0
+    event = "";
+    cigar = "",
+
+    for cigar in cigar_list:
+        event, event_len = cigar[-1], int(cigar[:-1])
+
+        if event in ("M", "=", "X"):
+            while k < event_len:
+                if read_seq[i] != ref_seq[j] and quals[i] < basequalthresh:
+                    cnt += 1
+                i += 1
+                j += 1
+                k += 1
+            k = 0
+        elif event in ("I", "S"):
+            while k < event_len:
+                if quals[i] < basequalthresh:
+                    cnt += 1
+                i += 1
+                k += 1
+            k = 0
+        elif event == "D":
+            j += event_len
+
+    return cnt
+
+from .utilities import cigar_ptrn, split
 from .utilities import (
     split_cigar,
     most_common,
@@ -39,29 +99,44 @@ from .localn import (
     findall_mismatches,
 )
 
-from pysam.libcfaidx cimport FastaFile
-from pysam.libcalignedsegment cimport AlignedSegment
-from pysam.libcalignmentfile cimport AlignmentFile
+from pysam.libcfaidx import FastaFile
+from pysam.libcalignedsegment import AlignedSegment
+from pysam.libcalignmentfile import AlignmentFile
 
 random.seed(123)
 
-cigar_ptrn = re.compile(r"[0-9]+[MIDNSHPX=]")
+
+def locate_indels(cigarstring: str, aln_start_pos: int) -> tuple:
+    aln_start_pos -= 1
+
+    cigar_lst = cigar_ptrn.findall(cigarstring)
+
+    ins = []
+    dels = []
+    for cigar in cigar_lst:
+        event, event_len = cigar[-1], int(cigar[:-1])
+        if event == "I":
+            ins.append((aln_start_pos, event_len))
+        elif event == "D":
+            dels.append((aln_start_pos, event_len))
+            aln_start_pos += event_len
+        elif event == "H" or event == "P":
+            pass
+        else:
+            aln_start_pos += event_len
+
+    return ins, dels
 
 
-cdef tuple make_pileup(
-    Variant target, 
-    AlignmentFile bam, 
-    UnsplicedLocalReference unspl_loc_ref,
-    bint exclude_duplicates, 
-    int window, 
-    int downsamplethresh, 
-    int basequalthresh,
-):
-    cdef str chrom
-    cdef int pos
-    cdef FastaFile reference
-    cdef AlignedSegment seg
-    cdef dict read
+def make_pileup(
+    target: Variant,
+    bam: AlignmentFile,
+    unspl_loc_ref: UnsplicedLocalReference,
+    exclude_duplicates: bool,
+    window: int,
+    downsamplethresh: int,
+    basequalthresh: int,
+) -> tuple:
     
     chrom, pos, reference = target.chrom, target.pos, target.reference
     rpos = max(v.pos for v in target.generate_equivalents())
@@ -123,9 +198,7 @@ def is_within_intron(read, pos, window):
             return False
 
 
-cdef list fetch_reads(str chrom, int pos, AlignmentFile bam, int ref_len, int window, bint exclude_duplicates):
-    
-    cdef AlignedSegment read
+def fetch_reads(chrom: str, pos: int, bam: AlignmentFile, ref_len: int, window: int, exclude_duplicates: bool) -> list:
     
     pos = pos - 1  # convert to 0-based
 
@@ -153,17 +226,15 @@ cdef list fetch_reads(str chrom, int pos, AlignmentFile bam, int ref_len, int wi
     return reads
 
 
-cdef dict dictize_read(
-    AlignedSegment read, 
-    str chrom, 
-    int pos, 
-    int rpos, 
-    FastaFile reference, 
-    UnsplicedLocalReference unspl_loc_ref, 
-    int basequalthresh
-):
-    
-    cdef tuple ins, deln
+def dictize_read(
+    read: AlignedSegment,
+    chrom: str,
+    pos: int,
+    rpos: int,
+    reference: FastaFile,
+    unspl_loc_ref: UnsplicedLocalReference,
+    basequalthresh: int
+) -> dict:
     
     cigar_string = read.cigarstring
     cigar_list = cigar_ptrn.findall(cigar_string)
@@ -266,24 +337,24 @@ cdef dict dictize_read(
     return read_dict
 
 
-cdef str get_ref_seq(
-    str chrom,
-    int aln_start, 
-    int aln_end,
-    str cigar_string, 
-    list cigar_list,
-    FastaFile reference,
-    UnsplicedLocalReference unspl_loc_ref,
-):
-    cdef int current_pos = aln_start - 1
+def get_ref_seq(
+    chrom: str,
+    aln_start: int,
+    aln_end: int,
+    cigar_string: str,
+    cigar_list: list,
+    reference: FastaFile,
+    unspl_loc_ref: UnsplicedLocalReference,
+) -> str:
+    current_pos = aln_start - 1
     
     if not "N" in cigar_string:
         #reference.fetch(chrom, current_pos, aln_end)
         return unspl_loc_ref.get_ref_seq(current_pos, aln_end)
         
-    cdef str ref_seq = ""
-    cdef str event, cigar
-    cdef int event_len
+    ref_seq = ""
+    event, cigar = "", ""
+    event_len = 0
     
     for cigar in cigar_list:
         event, event_len = cigar[-1], int(cigar[:-1])
@@ -298,19 +369,19 @@ cdef str get_ref_seq(
     return ref_seq
 
 
-cdef tuple leftalign_indel_read(
-    str chrom,
-    int pos,
-    int indel_len,
-    str indel_type,
-    str cigar_string,
-    int read_start,
-    int aln_start,
-    str read_seq,
-    str ref_seq,
-    object read_qual,
-    FastaFile reference,
-):
+def leftalign_indel_read(
+    chrom: str,
+    pos: int,
+    indel_len: int,
+    indel_type: str,
+    cigar_string: str,
+    read_start: str,
+    aln_start: str,
+    read_seq: str,
+    ref_seq: str,
+    read_qual: object,
+    reference: FastaFile,
+) -> tuple:
     lt_flank, rt_flank = split(
         read_seq, cigar_string, pos, read_start, is_for_ref=False, reverse=False
     )
@@ -335,10 +406,10 @@ cdef tuple leftalign_indel_read(
     return pos, lt_flank, indel_seq, rt_flank, lt_ref, rt_ref, lt_qual, rt_qual, var
     
 
-cdef bint is_end_dirty(array.array read_qual, int basequalthresh, int pos, int read_start, int read_end, str cigar_string):
-    cdef int dist_to_left_end = pos - read_start
-    cdef int dist_to_right_end = read_end - pos
-    cdef bint is_lefty
+def is_end_dirty(read_qual: array.array, basequalthresh: int, pos: int, read_start: int, read_end: int, cigar_string: str) -> bool:
+    dist_to_left_end = pos - read_start
+    dist_to_right_end = read_end - pos
+    is_lefty = False
 
     if dist_to_left_end < 0:
         is_lefty = True
@@ -356,7 +427,7 @@ cdef bint is_end_dirty(array.array read_qual, int basequalthresh, int pos, int r
             return min(read_qual[-3 :]) < basequalthresh
 
 
-cdef str leftalign_cigar(str cigarstring, Variant target, int read_start):
+def leftalign_cigar(cigarstring: str, target: Variant, read_start: int) -> str:
     target.normalize(inplace=True)
 
     pos = target.pos
@@ -377,7 +448,7 @@ cdef str leftalign_cigar(str cigarstring, Variant target, int read_start):
     return "".join(lt_cigar_lst) + new_cigar
 
 
-cdef tuple parse_spliced_read(str cigar_string, int read_start, int read_end, int pos, int rpos):
+def parse_spliced_read(cigar_string: str, read_start: int, read_end: int, pos: int, rpos: int) -> tuple:
     spliced_subreads = get_spliced_subreads(cigar_string, read_start, read_end)
 
     

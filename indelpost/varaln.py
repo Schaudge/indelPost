@@ -1,7 +1,3 @@
-#cython: embedsignature=True
-#cython: profile=False
-
-cimport cython
 import random
 import numpy as np
 from functools import partial
@@ -20,26 +16,27 @@ from .localn import find_by_smith_waterman_realn, make_aligner
 from .alleles import phase_nearby_variants
 from .contig import compare_contigs
 from .utilities import (
+    split,
     get_local_reference, 
     relative_aln_pos, 
     split_cigar, 
     most_common_gap_ptrn,
-    get_gap_ptrn2,
     most_common
 )
-from indelpost.pileup cimport make_pileup
-from indelpost.utilities cimport split
-from indelpost.contig cimport Contig, FailedContig 
+from indelpost.pileup import make_pileup
+from .contig import Contig, FailedContig
 
-from indelpost.variant cimport Variant, NullVariant
-from indelpost.local_reference cimport UnsplicedLocalReference
+from .variant import Variant, NullVariant
+from indelpost.local_reference import UnsplicedLocalReference
 
-from pysam.libcalignmentfile cimport AlignmentFile
+from pysam.libcalignmentfile import AlignmentFile
 
 random.seed(123)
 
-cdef class VariantAlignment:
-    """This class accepts the target indel as :class:`~indelpost.Variant` 
+
+class VariantAlignment(object):
+    """
+    This class accepts the target indel as :class:`~indelpost.Variant`
     and the BAM file as `pysam.AlignmentFile <https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignmentFile>`__ .
     Upon creation, the target indel is searched through realignment.
     Evaluation of the equality between :class:`~indelpost.VariantAlignment` objects triggers local-phasing around the indels 
@@ -99,24 +96,24 @@ cdef class VariantAlignment:
     no_realignment : bool
         True to only analyzed gap-aligned indels (default False)
     """
-    def __cinit__(
+    def __init__(
         self,
-        Variant target,
-        AlignmentFile bam,
-        int window=50,
-        bint exclude_duplicates=True, 
-        int retarget_search_window=30,
-        float retarget_similarity_cutoff=0.7,
-        bint exact_match_for_shiftable=True,
-        int mapping_quality_threshold=1,
-        int downsample_threshold=1000,
-        int base_quality_threshold=20,
-        int match_score=3,
-        int mismatch_penalty=2,
-        int gap_open_penalty=3,
-        int gap_extension_penalty=1,
-        bint auto_adjust_extension_penalty=True,
-        bint no_realignment=False,
+        target: Variant,
+        bam: AlignmentFile,
+        window: int = 50,
+        exclude_duplicates: bool = True,
+        retarget_search_window: int = 30,
+        retarget_similarity_cutoff: float = 0.7,
+        exact_match_for_shiftable: bool = True,
+        mapping_quality_threshold: int = 1,
+        downsample_threshold: int = 1000,
+        base_quality_threshold: int = 20,
+        match_score: int = 3,
+        mismatch_penalty: int = 2,
+        gap_open_penalty: int = 3,
+        gap_extension_penalty: int = 1,
+        auto_adjust_extension_penalty: bool = True,
+        no_realignment: bool = False
     ):
         
         self.target, second_target = target, target
@@ -168,7 +165,7 @@ cdef class VariantAlignment:
                                          )
         self.__pileup, self.contig = self.__parse_pileup()
     
-    cdef __parse_pileup(self, Contig contig=None, bint retargeted=False, bint skip_read_end_check=False):
+    def __parse_pileup(self, contig: Contig = None, retargeted: bool = False, skip_read_end_check: bool = False):
         """Dictize reads for target indel and make target indel template by consensus
 
         bam (pysam.AlignmentFile)
@@ -176,8 +173,6 @@ cdef class VariantAlignment:
         smith_waterman (bool): True to perform SW realn
         template (bool): None if no indel template supplied
         """
-
-        cdef list pileup
 
         read_end_evidence_only = False
         
@@ -596,8 +591,6 @@ cdef class VariantAlignment:
                 filters reads with the median base call quality in indel pos +/- quality_window < quality_threshold.
         """
 
-        cdef dict read
-        
         pos, indel_len = self._observed_pos, len(self.target.indel_seq)
 
         r_pos = max(v.pos for v in self.__target.generate_equivalents())
@@ -846,12 +839,12 @@ def is_locally_ref(read, pos):
         return False
 
 
-cdef bint count_as_non_target(dict read, int pos, int del_len, int margin):
+def count_as_non_target(read: dict, pos: int, del_len: int, margin: int) -> bool:
     if read["is_target"]:
         return False
 
-    cdef int aln_start = read["aln_start"]
-    cdef int aln_end = read["aln_end"]
+    aln_start = read["aln_start"]
+    aln_end = read["aln_end"]
      
     # undetermined reads
     if read.get("undetermined", False):
@@ -880,20 +873,20 @@ def centrality(read, target_pos):
     relative_pos = relative_aln_pos(read["ref_seq"], read["cigar_list"], read["aln_start"], target_pos)
     return abs(0.5 - relative_pos)
 
-cdef list preprocess_for_contig_construction(
-    Variant target,
-    Variant orig_target,
-    list pileup,
-    UnsplicedLocalReference unspl_loc_ref,
-    int window,
-    int match_score,
-    int mismatch_penalty,
-    int gap_open_penalty,
-    int gap_extension_penalty,
-):
+def preprocess_for_contig_construction(
+    target: Variant,
+    orig_target: Variant,
+    pileup: list,
+    unspl_loc_ref: UnsplicedLocalReference,
+    window: int,
+    match_score: int,
+    mismatch_penalty: int,
+    gap_open_penalty: int,
+    gap_extension_penalty: int,
+) -> list:
     
-    cdef dict read
-    cdef int clips, nonclips
+    read = {}
+    clips, nonclips = 0, 0
 
     if not pileup:
         return pileup
