@@ -16,13 +16,17 @@ Visit [documentation](https://indelpost.readthedocs.io/en/latest) for detail.
 
 To install (require Linux with Python>=3.6 pre-installed):
 ```
-pip install indelpost
+pip3 install indelpost
 ```
-or from source
+or from source for develop or debug
 ```
 git clone https://github.com/stjude/indelPost.git
 cd indelPost 
-python setup.py install
+python3 -m pip install --prefix=/home/schaudge/.local/lib/python3.10/site-packages/ --editable .  # recommand for debug mode
+```
+or
+```
+pip3 install --prefix=/home/schaudge/.local/lib/python3.10/site-packages/ --editable .
 ```
 
 ## Troubleshoot
@@ -36,11 +40,39 @@ AttributeError: module 'pysam.libcalignmentfile' has no attribute 'IteratorColum
 ```
 try:
 ```
-pip uninstall cython pysam indelpost
-pip install cython
-pip install pysam
-pip install indelpost --no-binary indelpost --no-build-isolation
+pip3 uninstall cython pysam indelpost
+pip3 install cython
+pip3 install pysam
+pip3 install indelpost --no-binary indelpost --no-build-isolation
 ```
+
+## Debug
+Make sure the python3-dbg and cygdb were installed! And recompile the cython pyx file by python3-gdb (add gdb_debug=True parameter in cythonize!)
+```
+python3-dbg setup.py build_ext --inplace
+```
+then, begin the debug process (with source code script annotate_indels.py):
+```
+cygdb . -- --args python3-dbg annotate_indels.py
+```
+A text 
+```
+Type "apropos cy" to search for commands related to "cy"...         # cy ---> cython debug command
+Reading symbols from python3-dbg...
+(gdb) cy break count_alleles       # function name, other format: indelpost.pileup.fetch_reads, indelpost.varaln.VariantAlignment.fetch_reads
+(gdb) cy run
+(gdb) cy list
+(gdb) cy locals
+(gdb) cy next (step)
+(gdb) 
+```
+some debug tips for review:
+
+cy break indelpost.varaln:610   # some gdb warning tips was not right!
+cy break indelpost.varaln.VariantAlignment.count_alleles
+
+If    "cy print variable"    will be broken, try:   "cy exec print(variable)"   for a replacement.
+
 
 ## Reference
 Hagiwara K et al. (2022) indelPost: harmonizing ambiguities in simple and complex indel alignments. [Bioinformatics](https://doi.org/10.1093/bioinformatics/btab601)

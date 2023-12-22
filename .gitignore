@@ -26,6 +26,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+dist-packages/
 downloads/
 eggs/
 .eggs/
@@ -131,6 +132,7 @@ venv.bak/
 # Spyder project settings
 .spyderproject
 .spyproject
+.idea/
 
 # Rope project settings
 .ropeproject
