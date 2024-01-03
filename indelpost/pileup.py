@@ -1,16 +1,10 @@
-import re
+
 import random
-
 import array
-
-from functools import partial
 from difflib import get_close_matches, SequenceMatcher
-
 
 from indelpost.variant import Variant
 from indelpost.local_reference import UnsplicedLocalReference
-
-from .consensus import consensus_refseq
 from .gappedaln import find_by_normalization
 
 
@@ -919,7 +913,7 @@ def update_read_info(
             aln, genome_aln_pos, ref_seq, read["read_seq"], basequals=read["read_qual"]
         )
         
-        is_found= False
+        is_found = False
         for indel in indels:
             if not indel.get("del_seq", False):
                 ref = indel["lt_ref"][-1]

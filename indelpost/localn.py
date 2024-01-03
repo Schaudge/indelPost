@@ -1,10 +1,5 @@
-#cython: profile=False
 
-import re
-import numpy as np
 from .sswpy import SSW
-
-from .consensus import is_compatible
 from .utilities import get_mapped_subreads, get_end_pos, make_insertion_first, to_minimal_repeat_unit
 from .utilities import cigar_ptrn, split
 
@@ -191,7 +186,6 @@ def is_worth_realn(read, target_indel, qual_lim=23):
                 if rt_end_read == rt_end_ref:
                     return False
 
-
     if mismatches:
         if is_lefty:
             lt_most_pos = min(var[0] for var in mismatches)
@@ -216,6 +210,7 @@ def is_worth_realn(read, target_indel, qual_lim=23):
         return True
 
     return False
+
 
 def is_target_by_ssw(
     read,

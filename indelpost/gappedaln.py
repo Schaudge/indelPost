@@ -1,6 +1,4 @@
-#cython: profile=False
 
-import numpy as np
 from .variant import Variant
 from .utilities import split, split_cigar, get_local_reference, relative_aln_pos, most_common
 from .localn import make_aligner, align, findall_indels, findall_mismatches, is_worth_realn
@@ -73,8 +71,6 @@ def find_by_normalization(
     #    return target, pileup, extension_penalty_used
 
 
-
-
 def is_target_by_normalization(read, target):
     """Check if read contains an indel equivalent to target
     
@@ -136,7 +132,7 @@ def avoid_left_aln(read, target):
     
     pos = target.pos #normalized
     if "N" in read["cigar_string"]:
-        if  read["covering_subread"]:
+        if read["covering_subread"]:
             return pos < read["covering_subread"][0]
         else:
             return True

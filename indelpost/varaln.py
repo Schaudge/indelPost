@@ -869,9 +869,11 @@ def count_as_non_target(read: dict, pos: int, del_len: int, margin: int) -> bool
     
     return True
 
+
 def centrality(read, target_pos):
     relative_pos = relative_aln_pos(read["ref_seq"], read["cigar_list"], read["aln_start"], target_pos)
     return abs(0.5 - relative_pos)
+
 
 def preprocess_for_contig_construction(
     target: Variant,
@@ -884,9 +886,6 @@ def preprocess_for_contig_construction(
     gap_open_penalty: int,
     gap_extension_penalty: int,
 ) -> list:
-    
-    read = {}
-    clips, nonclips = 0, 0
 
     if not pileup:
         return pileup

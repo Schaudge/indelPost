@@ -6,7 +6,9 @@ import pysam
 from indelpost import Variant
 from indelpost.varaln import VariantAlignment
 
-def main():
+
+def main(extended_window_size: int = 50):
+
     reference = pysam.FastaFile("/yunying/ref/human/b37/b37_Homo_sapiens_assembly19.fasta")
     bam = pysam.AlignmentFile("test/kit_complex_indel.bam")
 
@@ -18,8 +20,9 @@ def main():
     #print(cnt)
     # (4, 0, 4) as (reference, non_reference_non_target, target)
 
-    v2 = Variant("4", 55593495 + 116, "TGTTGAGGAGATAAATGGAAACAATTATGTTTACATAGACCCAACACAACTTCCTTATGATC", "CCCTG", reference)
-    valn2 = VariantAlignment(v2, bam, window=50, exclude_duplicates=False, downsample_threshold=2000000, base_quality_threshold=15)
+    v2 = Variant("4", 55593611, "TGTTGAGGAGATAAATGGAAACAATTATGTTTACATAGACCCAACACAACTTCCTTATGATC", "CCCTG", reference)
+    valn2 = VariantAlignment(v2, bam, window=extended_window_size, exclude_duplicates=False,
+                             downsample_threshold=2000000, base_quality_threshold=5)
     cnt2 = valn2.count_alleles(three_class=True)
     print(cnt2)
 
@@ -45,4 +48,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    from sys import argv
+    main(int(argv[1]) if len(argv) > 1 else 50)
