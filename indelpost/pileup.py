@@ -275,7 +275,8 @@ def dictize_read(
     read_dict["low_qual_base_num"] = count_lowqual_non_ref_bases(read_seq, ref_seq, read_qual, cigar_list, basequalthresh)
     read_dict["is_end_dirty"] = is_end_dirty(read_qual, basequalthresh, pos, read_start, read_end, cigar_string)
     read_dict["is_dirty"] = sum(q <= basequalthresh for q in read_qual) / len(read_seq) > 0.15
-        
+    read_dict["is_duplicated"] = read.is_duplicate
+
     insertions, deletions = locate_indels(cigar_string, read_start)
     
     for ins in insertions:
