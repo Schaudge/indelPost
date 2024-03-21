@@ -1,7 +1,6 @@
 import re
-import array
-
-import numpy as np
+from array import array
+from typing import Any
 from collections import namedtuple
 from operator import mul
 from functools import reduce
@@ -21,6 +20,7 @@ def most_common(lst):
 def get_gap_ptrn(read):
     return "".join([c for c in read["cigar_list"] if "D" in c or "I" in c])
 
+
 def get_gap_ptrn2(read):
     ptrn = ""
     pos = read["aln_start"]
@@ -33,14 +33,17 @@ def get_gap_ptrn2(read):
             if event == "D":
                 pos += event_len
     return ptrn
-        
+
+
 def most_common_gap_pattern(targetpileup):
     ptrns = [get_gap_ptrn(read) for read in targetpileup]
     return most_common(ptrns)
- 
+
+
 def most_common_gap_ptrn(targetpileup):
     ptrns = [get_gap_ptrn2(read) for read in targetpileup]
     return most_common(ptrns)
+
 
 def to_flat_list(lst_of_lst: list) -> list:
     return [i for lst in lst_of_lst for i in lst]
@@ -175,8 +178,6 @@ def repeat_counter(query_seq, flank_seq):
     return count
 
 
-
-
 def get_mapped_subreads(cigarstring: str, aln_start_pos: int, aln_end_pos: int) -> list:
     
     cigar_lst = cigar_ptrn.findall(cigarstring)
@@ -221,8 +222,6 @@ def get_end_pos(read_start_pos: int, lt_flank: str, cigarstring: str) -> int:
         i += 1
 
     return read_start_pos + flank_len
-
-
 
 
 def split_cigar(cigarstring: str, target_pos: int, start: int) -> tuple:
@@ -278,7 +277,7 @@ def merge_consecutive_gaps(cigar_lst):
 
 def make_insertion_first(cigarstring):
     
-    cigar_lst = cigar_ptrn.findall(cigarstring)    
+    cigar_lst = cigar_ptrn.findall(cigarstring)
     
     merged_cigar_lst = merge_consecutive_gaps(cigar_lst)
     new_cigar = []
@@ -321,17 +320,16 @@ def relative_aln_pos(ref_seq, cigar_lst, aln_start, target_pos, include_clip=Fal
     return ref_seq_pos / len(ref_seq)
 
 
-def split(data: object, cigarstring: str, target_pos: int, string_pos: int, is_for_ref: bool, reverse: bool) -> tuple:
+def split(data: Any, cigarstring: str, target_pos: int, string_pos: int, is_for_ref: bool, reverse: bool) -> tuple:
     
     cigar_lst = cigar_ptrn.findall(cigarstring)
     _size = len(cigar_lst)
-
     
     data_moves = [0] * _size
     genome_moves = [0] * _size
     
     i = 0; j = 0
-    
+
     for cigar in cigar_lst:
         event, event_len = cigar[-1], int(cigar[:-1])
         
@@ -377,13 +375,13 @@ def split(data: object, cigarstring: str, target_pos: int, string_pos: int, is_f
      
     diff = string_pos - (target_pos + 1)if reverse else target_pos - string_pos
     if reverse:
-        lt = data[j + diff :]
+        lt = data[j + diff:]
         lt = lt[::-1]
         rt = data[: j + diff]
         rt = rt[::-1]
     else:
         lt = data[: j + diff]
-        rt = data[j + diff :]
+        rt = data[j + diff:]
      
     return lt, rt
 
@@ -396,8 +394,6 @@ def get_local_reference(
     unspliced: bool = False,
     splice_pattern_only: bool = False,
 ) -> tuple:
-
-    span = ""
 
     chrom, pos, reference = target.chrom, target.pos, target.reference
     

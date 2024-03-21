@@ -160,7 +160,7 @@ def is_worth_realn(read, target_indel, qual_lim=23):
         return True
 
     # end clipped
-    if not is_lefty and  covering_start <= read["aln_end"] < covering_end and int(end_cigar[:-1]) > 2:
+    if not is_lefty and covering_start <= read["aln_end"] < covering_end and int(end_cigar[:-1]) > 2:
         return True
 
     mismatches = [

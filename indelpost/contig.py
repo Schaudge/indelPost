@@ -1,8 +1,6 @@
 import random
+import numpy as np
 from collections import OrderedDict
-
-import cython
-
 from .utilities import *
 
 from indelpost.variant import Variant
@@ -189,16 +187,14 @@ class Contig(object):
         
         qc_stats["clip_rate"] = sum(True for k, v in self.contig_dict.items() if not v[0]) / len(self.contig_dict)
         
-        lt_n_proportion = lt_n / lt_len
-        rt_n_proportion = rt_n / rt_len
         qc_stats["n_rate"] = (lt_n + rt_n) / (lt_len + rt_len)
 
         low_consensus_rate_lt = (
             sum(score < self.low_consensus_thresh for score in self.lt_consensus_scores) / lt_len
-        )
+        ) if lt_len > 0 else 0
         low_consensus_rate_rt = (
             sum(score < self.low_consensus_thresh for score in self.rt_consensus_scores) / rt_len
-        )
+        ) if lt_len > 0 else 0
        
         qc_stats["low_consensus_rate"] = (low_consensus_rate_lt * lt_len + low_consensus_rate_rt * rt_len) / (lt_len + rt_len)
         
